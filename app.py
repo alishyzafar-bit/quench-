@@ -2,14 +2,14 @@ from datetime import datetime
 
 import streamlit as st
 
-from components.charts import make_phase_chart, make_transformation_chart
-from components.theme import apply_theme
-from simulation.engine import MEDIUMS, simulate
-from views.guide import render_guide
-from views.logbook import render_logbook
+from charts import make_phase_chart, make_transformation_chart
+from theme import apply_theme
+from engine import MEDIUMS, simulate
+from guide import render_guide
+from logbook import render_logbook
 
 st.set_page_config(
-    page_title="QuenchIQ 2.0",
+    page_title="QuenchIQ 2.1",
     page_icon="🔥",
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -24,7 +24,7 @@ st.markdown(
     """
     <div class="hero">
       <div class="hero-kicker">HEAT TREATMENT • TRANSFORMATION • MICROSTRUCTURE</div>
-      <h1>Quench<span>IQ</span> <small>2.0</small></h1>
+      <h1>Quench<span>IQ</span> <small>2.1</small></h1>
       <p>Explore how carbon content, austenitizing temperature and cooling conditions
          influence the predicted transformation of plain-carbon steel.</p>
     </div>
