@@ -1,7 +1,7 @@
 import numpy as np
 import plotly.graph_objects as go
 
-from simulation.engine import screening_nose
+from engine import screening_nose
 
 PHASE_COLORS = {
     "Martensite": "#F07C8E",
@@ -50,16 +50,9 @@ def make_phase_chart(result):
 
 
 def make_transformation_chart(result, carbon, aust_temp, cooling_rate):
-    """Create a clearly labelled CCT-style educational screening map.
-
-    The transformation boundaries are illustrative, not experimental data. The
-    cooling path, Ms and Mf are internally linked to the current inputs.
-    """
+    """Create a clearly labelled CCT-style educational screening map."""
     time = np.logspace(-2, 4, 360)
     log_t = np.log10(time)
-
-    # The nose shifts with carbon in a qualitative way. This is intentionally
-    # labelled as a screening map rather than an alloy-specific CCT diagram.
     nose_temp, nose_time, _critical_rate = screening_nose(carbon, aust_temp)
     width = 1.0
 
@@ -78,7 +71,6 @@ def make_transformation_chart(result, carbon, aust_temp, cooling_rate):
         hovertemplate="t=%{x:.3g} s<br>T=%{y:.0f} °C<extra></extra>",
     ))
 
-    # Cooling path for a constant nominal rate: t = ΔT / rate.
     path_temp = np.linspace(aust_temp, 60, 240)
     path_time = np.maximum((aust_temp - path_temp) / cooling_rate, 0.001)
     fig.add_trace(go.Scatter(
@@ -97,10 +89,7 @@ def make_transformation_chart(result, carbon, aust_temp, cooling_rate):
     )
     boundary = result["critical_boundary"]
     boundary_temp = result["critical_temperature"]
-    if boundary == "A1":
-        boundary_label = "A1 727 °C"
-    else:
-        boundary_label = f"{boundary} {boundary_temp:.0f} °C"
+    boundary_label = "A1 727 °C" if boundary == "A1" else f"{boundary} {boundary_temp:.0f} °C"
     fig.add_hline(
         y=boundary_temp, line=dict(color="#A8B0BE", dash="dot", width=1),
         annotation_text=boundary_label, annotation_position="left"
