@@ -1,9 +1,8 @@
-"""Transparent screening model for plain-carbon steel.
+"""Transparent educational screening model for plain-carbon steel.
 
-QuenchIQ is an educational screening tool, not a substitute for an alloy-specific
-TTT/CCT dataset or laboratory measurements. The model intentionally exposes its
-assumptions so that users can distinguish established relationships from simplified
-trend estimates.
+QuenchIQ is an educational screening tool, not a substitute for alloy-specific
+TTT/CCT data or laboratory measurements. Medium effects, phase fractions,
+hardness and strength are deliberately presented as screening estimates.
 """
 
 from dataclasses import dataclass
@@ -12,18 +11,19 @@ from typing import Dict
 
 A1_C = 727.0
 EUTECTOID_CARBON = 0.76
-# Straight-line Fe-C phase-diagram screening approximation from the eutectoid point
-# (~0.76 wt%C, 727 °C) toward the Acm boundary near (~2.14 wt%C, 1147 °C).
 ACM_SLOPE_C_PER_WT_C = (1147.0 - A1_C) / (2.14 - EUTECTOID_CARBON)
 ROOM_TEMPERATURE_C = 25.0
 KOISTINEN_MARBURGER_ALPHA = 0.011
 
+# Relative screening severities. These are NOT physical heat-transfer coefficients.
+# They provide a transparent way to make the selected medium matter while the
+# user-entered cooling rate remains the base process input.
 MEDIUM_INFO = {
-    "Brine": "Very severe quench; agitation and concentration strongly affect the actual heat-transfer rate.",
-    "Water": "Severe quench; agitation, temperature and geometry strongly affect the actual rate.",
-    "Oil": "Moderate quench; oil type and temperature can change the cooling curve substantially.",
-    "Air": "Air cooling; the actual rate depends strongly on section size and airflow.",
-    "Furnace": "Very slow cooling; commonly associated with annealing-style cooling.",
+    "Brine": {"factor": 1.55, "note": "Very severe screening condition; concentration, agitation and temperature can change the real cooling curve."},
+    "Water": {"factor": 1.25, "note": "Severe screening condition; agitation, temperature and geometry strongly affect the real rate."},
+    "Oil": {"factor": 0.75, "note": "Moderate screening condition; oil type, viscosity and temperature strongly affect the real rate."},
+    "Air": {"factor": 0.28, "note": "Gentle screening condition; section size and airflow dominate the real cooling rate."},
+    "Furnace": {"factor": 0.10, "note": "Very gentle screening condition; furnace schedule and part size determine the real curve."},
 }
 MEDIUMS = tuple(MEDIUM_INFO)
 
@@ -71,24 +71,14 @@ def eutectoid_class(carbon: float) -> str:
 
 
 def estimate_ac3(carbon: float) -> float:
-    """Approximate Ac3 for hypoeutectoid plain-carbon steel."""
     return 910.0 - 203.0 * sqrt(max(carbon, 0.0)) - 15.2 * carbon
 
 
 def estimate_acm(carbon: float) -> float:
-    """Approximate Acm screening temperature for hypereutectoid plain-carbon steel.
-
-    This is a simple straight-line interpolation of the Fe-C diagram's Acm branch,
-    not a grade-specific experimental transformation temperature.
-    """
     return A1_C + ACM_SLOPE_C_PER_WT_C * (carbon - EUTECTOID_CARBON)
 
 
 def critical_temperature(carbon: float) -> float:
-    """Return the relevant upper critical boundary for austenitizing screening.
-
-    Hypoeutectoid -> Ac3; eutectoid -> A1; hypereutectoid -> Acm.
-    """
     classification = eutectoid_class(carbon)
     if classification == "Hypoeutectoid":
         return estimate_ac3(carbon)
@@ -107,28 +97,27 @@ def critical_boundary_label(carbon: float) -> str:
 
 
 def estimate_ms(carbon: float) -> float:
-    """Estimate Ms with the carbon-only form of the Barbier relation.
-
-    The full Barbier relation includes alloying-element terms; this interface
-    supplies carbon only, so the unavailable terms are set to zero.
-    """
+    """Carbon-only form of an empirical Barbier-style Ms relation."""
     return 545.0 - 601.2 * (1.0 - exp(-0.868 * carbon))
 
 
 def estimate_mf(ms: float) -> float:
-    """Nominal educational Mf screening marker, not an exact material constant."""
     return ms - 215.0
 
 
 def koistinen_marbürger_martensite(ms: float, final_temperature: float = ROOM_TEMPERATURE_C) -> float:
-    """Estimate martensite fraction using K-M when final temperature is below Ms."""
     if final_temperature >= ms:
         return 0.0
     fraction = 1.0 - exp(-KOISTINEN_MARBURGER_ALPHA * (ms - final_temperature))
     return _clamp(fraction * 100.0, 0.0, 100.0)
 
 
-def screening_nose(carbon: float, aust_temp: float) -> tuple[float, float, float]:
+def effective_cooling_rate(medium: str, base_rate: float) -> float:
+    """Medium-adjusted screening rate; not a measured heat-transfer calculation."""
+    return base_rate * MEDIUM_INFO[medium]["factor"]
+
+
+def screening_nose(carbon: float, aust_temp: float, medium: str = "Water") -> tuple[float, float, float]:
     """Return qualitative nose temperature, time and critical-rate marker."""
     nose_temp = 650.0 - 80.0 * carbon
     nose_time = 8.0 + 6.0 * carbon
@@ -137,16 +126,9 @@ def screening_nose(carbon: float, aust_temp: float) -> tuple[float, float, float
 
 
 def _screening_phase_fractions(inputs: SimulationInputs, ms: float, mf: float) -> Dict[str, float]:
-    """Create a qualitative transformation-product estimate.
-
-    This is not an experimental CCT calculation. Martensite is reserved using the
-    K-M room-temperature estimate and a cooling-path bypass factor; remaining products
-    are allocated qualitatively according to composition and cooling severity.
-    """
     carbon = inputs.carbon
-    rate = inputs.cooling_rate
-
-    _nose_temp, _nose_time, critical_rate = screening_nose(carbon, inputs.aust_temp)
+    rate = effective_cooling_rate(inputs.medium, inputs.cooling_rate)
+    _nose_temp, _nose_time, critical_rate = screening_nose(carbon, inputs.aust_temp, inputs.medium)
     rate_ratio = rate / critical_rate
     slow_factor = _clamp(1.0 - 0.55 * rate_ratio, 0.0, 1.0)
     bypass_factor = 1.0 / (1.0 + exp(-3.0 * (rate_ratio - 1.0)))
@@ -154,49 +136,48 @@ def _screening_phase_fractions(inputs: SimulationInputs, ms: float, mf: float) -
     km_martensite = koistinen_marbürger_martensite(ms)
     martensite = km_martensite * bypass_factor
 
+    # Retained austenite is exposed only as a screening estimate where the
+    # carbon level and rapid-cooling condition make incomplete K-M conversion relevant.
+    high_carbon_factor = _clamp((carbon - 0.65) / 0.75, 0.0, 1.0)
+    retained_austenite = max(0.0, 100.0 - km_martensite) * bypass_factor * high_carbon_factor * 0.55
+
     intermediate = exp(-((rate - 0.65 * critical_rate) / max(0.35 * critical_rate, 0.5)) ** 2)
-    bainite = (100.0 - martensite) * 0.35 * intermediate
-    remaining = max(0.0, 100.0 - martensite - bainite)
+    bainite = max(0.0, 100.0 - martensite - retained_austenite) * 0.35 * intermediate
+    remaining = max(0.0, 100.0 - martensite - retained_austenite - bainite)
 
     if carbon < EUTECTOID_CARBON:
-        ferrite_share = _clamp((EUTECTOID_CARBON - carbon) / (EUTECTOID_CARBON - 0.10), 0.0, 1.0)
-        ferrite_share *= slow_factor
+        ferrite_share = _clamp((EUTECTOID_CARBON - carbon) / (EUTECTOID_CARBON - 0.10), 0.0, 1.0) * slow_factor
         ferrite = remaining * ferrite_share
         pearlite = remaining - ferrite
         cementite = 0.0
     else:
-        cementite_share = _clamp((carbon - EUTECTOID_CARBON) / (1.40 - EUTECTOID_CARBON), 0.0, 1.0)
-        cementite_share *= slow_factor
+        cementite_share = _clamp((carbon - EUTECTOID_CARBON) / (1.40 - EUTECTOID_CARBON), 0.0, 1.0) * slow_factor
         cementite = remaining * cementite_share
         pearlite = remaining - cementite
         ferrite = 0.0
 
-    return _normalize({
+    phases = {
         "Martensite": martensite,
         "Bainite": bainite,
         "Pearlite": pearlite,
         "Ferrite": ferrite,
         "Cementite": cementite,
-    })
+        "Retained austenite": retained_austenite,
+    }
+    return _normalize(phases)
 
 
 def _hardness_estimate(carbon: float, phases: Dict[str, float], temper: bool, temper_temp: int) -> float:
-    """Educational HRC trend estimate; not a grade-specific property model."""
     hardness = 18.0 + 23.0 * carbon + 0.30 * phases["Martensite"] + 0.12 * phases["Bainite"]
     hardness = _clamp(hardness, 15.0, 68.0)
     if temper:
-        hardness -= 0.020 * max(0, temper_temp - 150)
+        # A deliberately broad educational tempering trend. It is not a grade-specific tempering curve.
+        reduction = 0.80 * (max(0, temper_temp - 150) / 500.0) * max(0.0, hardness - 18.0)
+        hardness -= reduction
     return _clamp(hardness, 15.0, 68.0)
 
 
-def simulate(
-    carbon: float,
-    aust_temp: int,
-    medium: str,
-    cooling_rate: float,
-    temper: bool = False,
-    temper_temp: int = 350,
-) -> dict:
+def simulate(carbon: float, aust_temp: int, medium: str, cooling_rate: float, temper: bool = False, temper_temp: int = 350) -> dict:
     inputs = SimulationInputs(carbon, aust_temp, medium, cooling_rate, temper, temper_temp)
     inputs.validate()
 
@@ -204,6 +185,10 @@ def simulate(
     mf = estimate_mf(ms)
     phases = _screening_phase_fractions(inputs, ms, mf)
     hardness = _hardness_estimate(inputs.carbon, phases, inputs.temper, inputs.temper_temp)
+
+    if inputs.temper and phases["Martensite"] > 0:
+        phases["Tempered martensite"] = phases.pop("Martensite")
+        phases = _normalize(phases)
 
     tensile = max(300.0, 420.0 + 19.0 * hardness + 120.0 * inputs.carbon)
     if inputs.temper:
@@ -216,15 +201,18 @@ def simulate(
     boundary = critical_boundary_label(inputs.carbon)
     aust_target = critical + 20.0
     aust_ok = inputs.aust_temp >= aust_target
+    effective_rate = effective_cooling_rate(inputs.medium, inputs.cooling_rate)
 
-    if primary_phase == "Martensite":
-        explanation = "The selected cooling rate strongly favors martensitic transformation after the diffusional-transformation window is avoided."
+    if primary_phase in ("Martensite", "Tempered martensite"):
+        explanation = "The selected cooling condition strongly favors martensitic transformation after the diffusional-transformation window is bypassed."
     elif primary_phase == "Bainite":
-        explanation = "The screening model places the cooling condition in an intermediate transformation range; the exact bainite fraction requires alloy-specific CCT data."
+        explanation = "The screening model places the cooling condition in an intermediate transformation range; exact bainite behavior requires alloy-specific CCT data."
     elif primary_phase == "Ferrite":
         explanation = "For this hypoeutectoid composition and relatively slow cooling, proeutectoid ferrite is predicted alongside pearlite."
     elif primary_phase == "Cementite":
         explanation = "For this hypereutectoid composition and relatively slow cooling, proeutectoid cementite is predicted alongside pearlite."
+    elif primary_phase == "Retained austenite":
+        explanation = "The screening model indicates that some austenite may remain untransformed at room temperature; the estimate is especially sensitive to carbon and cooling history."
     else:
         explanation = "The screening model predicts pearlite as the dominant diffusional product."
 
@@ -243,7 +231,9 @@ def simulate(
         "aust_target": aust_target,
         "aust_temp_ok": aust_ok,
         "explanation": explanation,
-        "medium_note": MEDIUM_INFO[inputs.medium],
+        "medium_note": MEDIUM_INFO[inputs.medium]["note"],
+        "medium_factor": MEDIUM_INFO[inputs.medium]["factor"],
+        "effective_cooling_rate": effective_rate,
         "km_martensite_room_temp": koistinen_marbürger_martensite(ms),
-        "model_scope": "Plain-carbon steel screening model; no Mn/Si/Cr/Ni/Mo or alloy-specific TTT/CCT data supplied.",
+        "model_scope": "Plain-carbon steel screening model; no alloy-specific TTT/CCT data or measured heat-transfer curve supplied.",
     }
