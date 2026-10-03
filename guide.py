@@ -1,86 +1,29 @@
 import streamlit as st
 
-
 def render_guide():
-    st.markdown("### Phase & heat-treatment guide")
-    st.caption("A compact learning layer: what the terms mean, what the model uses, and where the model stops.")
-
-    items = [
-        ("Austenite (γ)", "The high-temperature FCC phase from which the cooling transformation is screened. QuenchIQ assumes an appropriate austenitized condition before cooling; the app does not model dissolution, homogenization or prior processing history."),
-        ("Ferrite (α)", "A relatively soft BCC iron-rich phase. In hypoeutectoid plain-carbon steel, proeutectoid ferrite can form before pearlite during slower cooling."),
-        ("Pearlite", "A lamellar ferrite–cementite transformation product formed by diffusional transformation. Lamellar spacing and morphology vary with transformation temperature; QuenchIQ does not resolve those features."),
-        ("Bainite", "An intermediate transformation product formed over a temperature range between diffusional products and martensitic transformation. Its start/finish ranges and fraction are strongly alloy- and condition-dependent, so QuenchIQ treats bainite as a qualitative screening tendency."),
-        ("Martensite", "A diffusionless transformation product formed as austenite cools below Ms. QuenchIQ uses a carbon-only empirical Ms estimate and a simplified cooling-path screening factor; actual behavior depends on composition, austenite condition and cooling history."),
-        ("Cementite", "Iron carbide, Fe₃C. The simplified hypereutectoid branch allows proeutectoid cementite as a possible diffusional product; actual morphology and amount require alloy-specific transformation data."),
-        ("Ms and Mf*", "Ms is the martensite-start temperature. QuenchIQ estimates Ms using a carbon-only form of an empirical Barbier relation because alloying elements are not entered. Mf* is deliberately marked as a screening marker, not an exact measured endpoint."),
-        ("Ac1 / Ac3 / Acm", "A1 is the eutectoid critical temperature. Ac3 is the upper critical boundary for hypoeutectoid steel, while Acm is the corresponding screening boundary on the hypereutectoid side. QuenchIQ uses simplified Fe–C screening relationships, not grade-specific dilatometry."),
-        ("Fe–Fe₃C vs TTT vs CCT", "The Fe–Fe₃C diagram describes equilibrium phase relationships. TTT describes transformation during isothermal holding. CCT describes transformation during continuous cooling. QuenchIQ's transformation plot is a schematic screening map, not an experimental CCT diagram."),
-        ("Cooling condition", "Brine, water, oil, air and furnace cooling differ in heat-transfer severity, but a medium name does not uniquely determine a cooling curve. Geometry, section thickness, agitation, quenchant temperature and position all matter. In QuenchIQ, the entered cooling rate drives the numerical screening model."),
-        ("Tempering", "Tempering changes the structure and properties of quenched steel. QuenchIQ represents tempering as a simplified property trend; it does not simulate tempering kinetics, carbide precipitation, retained austenite evolution or alloy-specific tempering reactions."),
+    st.markdown("### Phase, grade & heat-treatment guide")
+    st.caption("A compact learning layer: what the terms mean, what QuenchIQ calculates, and where it deliberately stops.")
+    items=[
+        ("Austenite (γ)","The high-temperature FCC phase from which cooling transformation is screened. QuenchIQ assumes an appropriate austenitized condition; dissolution, homogenization, prior processing and grain growth are not simulated."),
+        ("Steel grade library","QuenchIQ now includes representative screening chemistries for AISI 1045, 1080, 4140, 4340, 52100 and 8620 plus a custom chemistry option. These are representative values, not certified heat-analysis data."),
+        ("Alloying elements","Mn, Ni, Cr and Mo now influence the alloy-sensitive Ms estimates. Additional elements are stored in the chemistry model for future grade-specific relationships. This does not yet create experimental CCT/TTT behavior."),
+        ("Ferrite / Pearlite / Bainite","These transformation products are still allocated by a simplified screening model. Real start/finish temperatures, fractions, morphology and kinetics depend strongly on grade, austenite condition and cooling history."),
+        ("Martensite","A diffusionless product formed as austenite cools below Ms. QuenchIQ uses alloy-sensitive empirical Ms estimates followed by a simplified cooling-path screening factor."),
+        ("Ms and Mf*","Ms is the martensite-start temperature. QuenchIQ displays Andrews and Barbier-style empirical estimates separately and shows their blended value. Mf* remains a screening marker, not an exact measured endpoint."),
+        ("Andrews Ms model","The QuenchIQ implementation uses an alloy-sensitive empirical form: Ms = 539 − 423C − 30.4Mn − 17.7Ni − 12.1Cr − 7.5Mo, with composition in wt%. It is an empirical screening relationship, not a universal law."),
+        ("Barbier-style Ms model","A second alloy-sensitive empirical relationship is shown to expose model spread. Agreement between two equations should not be interpreted as experimental validation."),
+        ("Ac1 / Ac3 / Acm","A1 is the eutectoid critical temperature. Ac3 is the upper critical boundary for hypoeutectoid steel and Acm is the corresponding hypereutectoid screening boundary. These remain simplified Fe–C relationships rather than grade-specific dilatometry."),
+        ("Fe–Fe₃C vs TTT vs CCT","The Fe–Fe₃C diagram describes equilibrium phase relationships. TTT describes isothermal transformation. CCT describes continuous cooling. QuenchIQ's transformation map is still schematic, not an experimental CCT diagram."),
+        ("Cooling condition","Brine, water, oil, air and furnace conditions differ in heat-transfer severity, but a medium name does not uniquely determine a cooling curve. Geometry, section thickness, agitation and quenchant temperature still matter."),
+        ("Tempering","Tempering changes structure and properties of quenched steel. QuenchIQ currently represents it as a simplified property trend; carbide precipitation, detailed kinetics and grade-specific tempering curves are not modeled."),
     ]
-
-    for title, body in items:
-        with st.expander(title):
-            st.write(body)
-
+    for title,body in items:
+        with st.expander(title): st.write(body)
     st.markdown("### What QuenchIQ can do")
-    st.markdown(
-        """
-        **Use it to explore trends, not certify a treatment.**
-
-        - Compare the qualitative effect of carbon content and cooling rate in a plain-carbon steel screening model.
-        - Explore Ac1/Ac3/Acm screening boundaries, estimated Ms and a nominal Mf* marker.
-        - Visualize a selected cooling path against a schematic transformation map.
-        - Compare saved runs and inspect how changing inputs alters the screening outputs.
-        - Learn the relationship between composition, heat treatment, cooling and transformation products.
-        """
-    )
-
+    st.markdown("""- Select a representative steel grade or edit its screening chemistry.\n- Compare alloy-sensitive Ms estimates using two empirical relationships.\n- Explore Ac1/Ac3/Acm screening boundaries, estimated Ms and a nominal Mf* marker.\n- Visualize a selected cooling path against a schematic transformation map.\n- Compare saved runs and inspect how chemistry and process changes alter screening outputs.\n- Use the Jominy-style explorer as a conceptual hardenability learning aid.""")
     st.markdown("### Model boundaries")
-    st.markdown(
-        """
-        <div class="limit-card">
-        <b>QuenchIQ is an educational screening model — not a production heat-treatment calculator.</b><br><br>
-        The current model does <b>not</b> provide grade-specific predictions for:<br>
-        • alloy steels with Mn, Si, Cr, Ni, Mo, V, W and other alloying additions<br>
-        • experimental TTT/CCT curves or measured transformation kinetics<br>
-        • real component cooling curves or heat-transfer coefficients<br>
-        • section-size, geometry, agitation or quenchant-temperature effects<br>
-        • prior-austenite grain size and detailed austenitizing history<br>
-        • retained-austenite evolution<br>
-        • detailed bainite, pearlite or carbide morphology/kinetics<br>
-        • experimentally measured hardness, yield strength or tensile strength<br>
-        • detailed tempering reactions and carbide precipitation
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
+    st.markdown("""<div class="limit-card"><b>QuenchIQ is an educational screening model — not a production heat-treatment calculator.</b><br><br><b>Now supported:</b><br>• representative grade chemistry<br>• editable C, Mn, Si, Cr, Ni, Mo, V, Cu, W, Co, Al, P and S fields<br>• alloy-sensitive Ms screening<br><br><b>Still not modeled as validated engineering data:</b><br>• experimental grade-specific TTT/CCT curves or measured transformation kinetics<br>• real component cooling curves or heat-transfer coefficients<br>• section size, geometry, agitation or quenchant-temperature effects<br>• prior-austenite grain size and detailed austenitizing history<br>• detailed retained-austenite evolution<br>• detailed bainite, pearlite or carbide morphology/kinetics<br>• experimentally measured hardness, yield strength or tensile strength<br>• detailed tempering reactions and carbide precipitation</div>""",unsafe_allow_html=True)
     st.markdown("### Why real engineering data matters")
-    st.info(
-        "For an engineering heat-treatment decision, use the actual steel grade and validated grade-specific "
-        "TTT/CCT data, process records and laboratory measurements. Useful validation methods include "
-        "dilatometry, hardness testing and metallographic examination; tensile testing may be required when strength "
-        "properties are part of the specification. QuenchIQ is designed to help explain the concepts behind those measurements."
-    )
-
+    st.info("For an engineering heat-treatment decision, use the actual heat chemistry, validated grade-specific TTT/CCT data, process records and laboratory measurements. Useful validation methods include dilatometry, hardness testing and metallography; tensile testing may be required when strength properties are specified.")
     st.markdown("### References & model basis")
-    st.markdown(
-        """
-        **Core relationships and concepts**
-
-        - **Koistinen–Marburger relationship:** used for the temperature-driven martensite estimate below Ms.
-        - **Barbier empirical Ms relationship:** used in carbon-only form because the current interface does not accept alloying elements.
-        - **Fe–C phase diagram:** used for approximate A1, Ac3 and Acm screening boundaries.
-        - **TTT/CCT concepts:** used to frame the educational cooling-path screening map; the plotted curves are schematic.
-
-        **Selected references**
-
-        1. Koistinen, D.P. & Marburger, R.E. (1959), *A general equation prescribing the extent of the austenite-martensite transformation in pure iron-carbon alloys and plain carbon steels*, **Acta Metallurgica**, 7(1), 59–60. DOI: 10.1016/0001-6160(59)90170-1.
-        2. Dossett, J.L. & Totten, G.E. (eds.) (2014), *ASM Handbook, Volume 4D: Heat Treating of Irons and Steels*, ASM International.
-        3. Barbier empirical Ms relationship: used here in carbon-only form; the unavailable alloying-element terms are intentionally omitted.
-
-        **Model status:** QuenchIQ combines established metallurgical relationships with transparent educational approximations. 
-        Hardness, strength, phase allocation and Mf* are not certified or grade-specific values.
-        """
-    )
+    st.markdown("""**Koistinen–Marburger:** used for the temperature-driven martensite estimate below Ms.\n\n**Andrews-type Ms:** alloy-sensitive empirical relationship used for screening.\n\n**Barbier-style Ms:** second empirical estimate used to expose model spread.\n\n**Fe–C phase relationships:** used for approximate A1, Ac3 and Acm screening boundaries.\n\n**TTT/CCT:** used only as conceptual context; QuenchIQ does not yet plot published experimental transformation datasets.\n\n**Model status:** grade chemistry and Ms/Mf screening are now more realistic, but transformation kinetics, cooling physics and mechanical properties remain educational approximations.""")
